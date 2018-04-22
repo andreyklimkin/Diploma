@@ -29,10 +29,14 @@ def draw_value_anotate(ax, env, s, value, font_color='c'):
     
     ax.annotate("%.2f" % value, xy=(j-0.3, i), color='c', fontsize=11)
 
+def set_env_s0(env, s0):
+    env.isd = np.zeros(env.shape[0] * env.shape[1])
+    env.isd[s0] = 1 
+    
 
-def get_episode_reward(env, model, who, tmax,  possbile_s_stars):
+def get_episode_reward(env, model, who, s0, tmax, possbile_s_stars):
     policy_episode_reward = 0.0
-    set_random_s0(env)
+    set_env_s0(env, s0)
     env.reset()
     s = env.s
     if who != "Expert":
@@ -64,50 +68,53 @@ def get_episode_reward(env, model, who, tmax,  possbile_s_stars):
     return policy_episode_reward
         
         
-def get_policy_reward_estimation(env, model, who, episodes_to_estimate, tmax, s_star=None):
+def get_policy_reward_estimation(env, model, who, episodes_to_estimate, s0_list, tmax, s_star=None):
     episode_reward_estimation = []
     
     for ep in range(episodes_to_estimate):
-        episode_reward_estimation.append(get_episode_reward(env, model, who, tmax, s_star))
+        episode_reward_estimation.append(get_episode_reward(env, model, who, s0_list[ep], tmax, s_star))
     
     return np.array(episode_reward_estimation)    
 
-def draw_reward_curves(writer, iteration, ax, env, models, models_anotations, tmax, previous_rewards, possible_s_stars, estimation_episodes_num=500):
+def draw_reward_curves(writer, iteration, env, models, models_anotations, tmax, previous_rewards, possible_s_stars,     s0_list, estimation_episodes_num):
     
     colors = sns.color_palette("Set1", n_colors=len(models_anotations), desat=.75)
     
-    current_models_rewards = previous_rewards
+    #current_models_rewards = previous_rewards
     for i, model in enumerate(models):
         if("Expert" in models_anotations[i]):
-            current_models_rewards[i].append(get_policy_reward_estimation(env, model, who="Expert", 
-                                                                         episodes_to_estimate=estimation_episodes_num, tmax=tmax))
+            reward  = get_policy_reward_estimation(env, model, who="Expert", episodes_to_estimate=estimation_episodes_num, s0_list=s0_list, tmax=tmax)
         else:
             #print(model.name)
             if "goal" in models_anotations[i]:
-                current_models_rewards[i].append(get_policy_reward_estimation(env, model, who="Agent", 
-                                                                          episodes_to_estimate=estimation_episodes_num, 
-                                                                          tmax=tmax, s_star=possible_s_stars))
+                reward = get_policy_reward_estimation(env, model, who="Agent", episodes_to_estimate=estimation_episodes_num, 
+                                                                          s0_list=s0_list, tmax=tmax, s_star=possible_s_stars)
             else:
-                current_models_rewards[i].append(get_policy_reward_estimation(env, model, who="Agent", 
-                                                                          episodes_to_estimate=estimation_episodes_num, 
-                                                                          tmax=tmax, s_star=[None]))
-    if(len(current_models_rewards[0]) > 1):
-        for i in range(len(models_anotations)):
-            data = np.array(current_models_rewards)[i, :, :].T
-            #print(data.shape)
-            #print(np.mean(data[:, -1]))
-            #sns.tsplot(data=data, ax=ax, condition=models_anotations[i], color=colors[i], time=np.arange(1, len(current_models_rewards[0]) + 1))
-            #ax.plot(np.array(previous_rewards)[:, i], label=models_anotations[i], linewidth=3)
-            writer.add_scalars('learning_stats/reward_curves',
-                       {
-                           models_anotations[i]: np.mean(data[:, -1])
-                       }, iteration)
-        #ax.set_xlabel("Epoch")
-        #ax.set_ylabel("Estimated reward")
+                reward  = get_policy_reward_estimation(env, model, who="Agent", episodes_to_estimate=estimation_episodes_num, 
+                                                                          s0_list=s0_list, tmax=tmax, s_star=[None])
+        writer.add_scalars('learning_stats/reward_curves',
+                   {
+                       models_anotations[i]: np.mean(reward)
+                   }, iteration)
+
+def get_agents_reward(env, models, models_anotations, tmax, possible_s_stars,s0_list, estimation_episodes_num):
+    rewards = defaultdict(int)
     
-        #ax.legend(loc="best")
-    
-    return current_models_rewards
+    for i, model in enumerate(models):
+        if("Expert" in models_anotations[i]):
+            reward  = get_policy_reward_estimation(env, model, who="Expert", episodes_to_estimate=estimation_episodes_num, s0_list=s0_list, tmax=tmax)
+        else:
+            #print(model.name)
+            if "goal" in models_anotations[i]:
+                reward = get_policy_reward_estimation(env, model, who="Agent", episodes_to_estimate=estimation_episodes_num, 
+                                                                          s0_list=s0_list, tmax=tmax, s_star=possible_s_stars)
+            else:
+                reward  = get_policy_reward_estimation(env, model, who="Agent", episodes_to_estimate=estimation_episodes_num, 
+                                                                         s0_list=s0_list, tmax=tmax, s_star=[None])
+        rewards[models_anotations[i]] = reward
+        
+    return rewards
+        
 
 def fig2data ( fig ):
     """

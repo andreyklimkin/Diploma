@@ -1,11 +1,9 @@
 import numpy as np
 
 def set_random_s0(env):
-    rand_s0 = np.random.randint(1, env.nS - 1)
-    
-    for i in range(len(env.isd)):
-        env.isd[i] = 0
-    
+    rand_s0 = np.random.choice(np.array(np.where(env.grid_map)).flatten())
+    #print(rand_s0)
+    env.isd = np.zeros(env.shape[0] * env.shape[1])
     env.isd[rand_s0] = 1 
 
 def check_equivalence(s1, s2, eps=1e-9):

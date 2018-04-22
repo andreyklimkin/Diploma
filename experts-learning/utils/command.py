@@ -39,4 +39,3 @@ class Command(object):
             print('Command timeout, kill it: ' + self.cmd)
             self.process.kill()
             self.thread.join()
-
